@@ -1,0 +1,185 @@
+1. microservices dependencies:
+
+1.1. SpringWeb
+1.2. PostgreSQL Driver
+1.3. Lombok
+1.4. Spring Data JPA
+1.5. OpenFeign (routing)
+1.6. Eureka Discovery Client
+1.7. modelmapper
+        <dependency>
+            <groupId>org.modelmapper</groupId>
+            <artifactId>modelmapper</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+
+2. Create packages
+
+2.1. controller
+2.2. entity
+        @Getter
+        @Setter
+        @Builder
+        public class ResponseWrapper {
+            private boolean success;
+            private String message;
+            private Integer code;
+            private Object data;
+2.3. repository
+2.4. service
+2.5. util/MapperUtil.java
+       private final ModelMapper modelMapper;
+
+        public MapperUtil(ModelMapper modelMapper) {
+            this.modelMapper = modelMapper;
+        }
+
+        public <T> T convert(Object objectToBeConverted, T convertedObject){
+            return modelMapper.map(objectToBeConverted, (Type) convertedObject.getClass());
+        }
+
+        Add in application runner class
+
+            @EnableFeignClients
+
+        AND
+            @Bean
+            public ModelMapper mapper() {
+                return new ModelMapper();
+            }
+
+3. Create QuizContoller with
+
+    @RestController
+    @RequestMapping("/quiz")
+
+    private final QuizService quizService;
+    Dependency inject it on constructor
+
+    @GetMapping("{id}")     (@PathVariable("id") Long courseId)
+    @GetMapping             (@ParamVariable Long id)
+    @PostMapping            (@RequestBody CourseDTO course)
+        public ResponseEntity<ResponseWrapper>
+
+            @Getter
+            @Setter
+            @Builder
+            public class ResponseWrapper {
+
+                private boolean success;
+                private String message;
+                private Integer code;
+                private Object data;
+
+
+4. Create service/QuizService interface and service/impl/QuizServiveImpl
+
+    @Service
+
+5. Entity Quiz
+
+    @Data
+    @Entity
+    @Table(name = "COURSES")
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "ID")
+
+6. Repository interface extends JpaRepository<Quiz, Long>
+
+------------ MICROSERVICES ------------------------
+
+1. Enable different port numbers for multiple instances of application (default 8080)
+
+1.1. Menu Run > Edit Configurations
+1.2. copy configuration to create second application configuration > modify options > Add VMoptions >
+1.3. in Build and run section, next to Java SDK box type: -Dserver.port=8081 > apply
+1.4. start second instance in top navifation bar
+https://www.youtube.com/watch?v=D4PyHi90C4Q&list=PLsyeobzWxl7rRyGcqgZ3MP5pWGPwUvprI&index=18
+    ----------- Eureka Service Regestry ---------
+2. Create service registry with Eureka: create new project with Spring Web and Eureka Server dependancies
+2.1. in runner class add @EnableEurekaServer
+2.2. populate application.properties with
+
+    spring.application.name=service-registry
+    server.port=8761
+    eureka.instance.hostname=localhost'
+    eureka.client.fetch-registry=false
+    eureka.client.register-with-eureka=false
+
+2.3. start application and check if it's running by going to http://localhost:8761/
+2.4. in questions application:
+2.4.1. ensure eureka dependency is added in pom.xml
+2.4.2. spring.application.name=question-service added in application.properties file
+2.4.3. start application, refresh Eureka UI and make sure you can see service registered.
+
+https://www.youtube.com/watch?v=KvGugXhgbr8&list=PLsyeobzWxl7rRyGcqgZ3MP5pWGPwUvprI&index=19
+
+    ----------- Feing  ---------
+
+3. Quiz preporation
+3.1. create feign/QuizInterface.class interface; add @FeignClient("QUESTION-SERVICE") annotation / QUESTION-SERVICE given in service provider app
+3.2. copy methods definitions from questions controller and paste them in QuizInterface:
+
+        @GetMapping("getList")
+        public ResponseEntity<List<Long>> getListOfQuestions (@RequestParam String subject, @RequestParam Integer count);
+
+3.4. inject dependancy in QuizServiceImpl
+
+      private final QuizInterface quizInterface;
+
+        Make sure runner class has @EnableFeignClients
+
+3.5. Add in application.properties server.port=808? to make sure port is not used
+
+3.6. in Quize code use QuizeInterface declafed methods to access question services.
+
+4. To check what port is being used (what version of question service is used) add this in controller:
+
+        import org.springframework.core.env.Environment;
+        Environment environment;
+
+    in method add:
+
+        System.out.println(environment.getProperty("local.server.port"));
+
+--------- API Gateway ---
+
+5. New project with Eureka server and Gateway(Spring Cloud Routing) dependencies
+
+5.1. make sure non mvc gateway dependency added in pom.xml
+
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+
+        not the spring-cloud-starter-gateway-mvc
+
+
+
+
+5.2. add server.port=8765 to application.properties and start application.
+    you should see api-gateway added to eureka server
+
+    Once we do that then we do not need to use each specific service port like
+
+        localhost:8090/quiz/get/1
+
+    but we can use api-gateway port and servicename for all of them
+
+        localhost:8765/QUIZES-SERVICE/quiz/get/1
+
+5.3. to enable lower case service name add in application.properties
+
+        spring.cloud.gateway.discovery.locator.lower-case-service-id=true
+
+    now you can use
+
+        localhost:8765/quizes-service/quiz/get/1
+
+
+
+
+
